@@ -6,25 +6,96 @@
   
   <script>
 
+    const formatErrorId = (id) => {
+      // split id on uppercase letters, format each chunk to start with an uppercase letter, and then join them back together :>
+      return id.split(/(?=[A-Z])/).map(s => s[0].toUpperCase() + s.slice(1)).join(' ');
+    }
+
+    const handleResponse = async (response) => {
+      const content = document.querySelector('#content');
+
+      const responseText = await response.text()
+      
+      console.log(responseText)
+
+      let responseData = {}
+
+      const contentType = response.headers.get('content-type')
+
+      switch (contentType) {
+        case 'text/xml': 
+        case 'application/xml':
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(responseText, contentType)
+          const message = doc.querySelector('message')
+          const id = doc.querySelector('id')
+          if (message) responseData.message = message.textContent
+          if (id) responseData.id = id.textContent
+          break
+        case 'application/json':
+          responseData = await JSON.parse(responseText)
+          break
+        default:
+          console.error(`Unknown content-type in response: ${contentType}`)
+          return
+          break
+      }
+
+      let htmlString = `<p>Message: ${responseData.message}</p>`
+      if (responseData.id) htmlString = `<h1>${formatErrorId(responseData.id)}</h1>` + htmlString
+      content.innerHTML = htmlString
+    }
+
+    const sendGet = async (testForm) => {
+      const method = testForm.getAttribute('method');
+
+      const page = testForm.querySelector("#page").value;
+      const type = testForm.querySelector("#type").value
+
+      const response = await fetch(page, {
+        method: method,
+        headers: {
+          'Accept': type
+        }
+      })
+
+      handleResponse(response)
+    }
+
+    const init = () => {
+      const testForm = document.querySelector("#testForm");
+      
+      const runTest = (e) => {
+        e.preventDefault();
+        sendGet(testForm);
+        return false
+      }
+
+      testForm.addEventListener('submit', runTest)
+    }
+
+    window.onload = init;
   </script>
 </head>
 <body>
   <section id="top">
     <h3>Status Code Tests</h3>
-    <select id="page">
-      <option value="/success">Success</option>
-      <option value="/badRequest">Bad Request</option>
-      <option value="/unauthorized">Unauthorized</option>
-      <option value="/forbidden">Forbidden</option>
-      <option value="/internal">Internal</option>
-      <option value="/notImplemented">Not Implemented</option>
-      <option value="/notFound">Not Found</option>
-    </select>
-    <select id="type">
-      <option value="application/json">JSON</option>
-      <option value="text/xml">XML</option>
-    </select>
-    <button id="send">Send</button>
+    <form id="testForm" method="get">
+      <select id="page">
+        <option value="/success">Success</option>
+        <option value="/badRequest">Bad Request</option>
+        <option value="/unauthorized">Unauthorized</option>
+        <option value="/forbidden">Forbidden</option>
+        <option value="/internal">Internal</option>
+        <option value="/notImplemented">Not Implemented</option>
+        <option value="/notFound">Not Found</option>
+      </select>
+      <select id="type">
+        <option value="application/json">JSON</option>
+        <option value="text/xml">XML</option>
+      </select>
+      <button id="send">Send</button>
+    </form>
   </section>
   <section id="content">
   </section>
